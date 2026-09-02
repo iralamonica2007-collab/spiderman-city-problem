@@ -129,3 +129,12 @@ class MissionPlanner:
             key=lambda m: (-m.mission_score, m.route.distance_km, m.incident.name)
         )
         return missions
+
+    def recommend_mission(
+        self, spiderman_location: Location, incidents: Iterable[Incident]
+    ) -> Mission:
+        """Return the mission that makes the most sense right now."""
+        missions = self.plan_missions(spiderman_location, incidents)
+        if not missions:
+            raise MissionPlannerError("No incidents provided, nothing to plan.")
+        return missions[0]
