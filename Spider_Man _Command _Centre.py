@@ -1,4 +1,4 @@
-# SPIDER-MAN COMMAND CENTRE (Unified Execution System)
+# SPIDER-MAN COMMAND CENTRE (Unified Execution Module)
 
 from spiderman_incident_display import (
     calculate_priority_score,
@@ -8,7 +8,9 @@ from spiderman_incident_display import (
 from priority_search_using_dijkstra import (
     MissionPlanner,
     Incident as DijkstraIncident,
-    UnknownLocationError
+    UnknownLocationError,
+    UnreachableLocationError,
+    MissionPlannerError
 )
 from terminal_file import create_incident_entry
 
@@ -32,8 +34,13 @@ def view_active_incidents():
         return
 
     for inc in active:
-        print(f"\nID: {inc['id']} | Type: {inc['type']} | Status: {inc['status']}")
-        print(f"Location: {inc['location']} | Severity: {inc['severity']} | People: {inc['people_affected']}")
+        print(f"\nID          : {inc['id']}")
+        print(f"Type        : {inc['type']}")
+        print(f"Location    : {inc['location']}")
+        print(f"Severity    : {inc['severity']}")
+        print(f"People      : {inc['people_affected']}")
+        print(f"Description : {inc['description']}")
+        print(f"Status      : {inc['status']}")
 
 
 def view_response_priority():
@@ -45,10 +52,9 @@ def get_next_mission():
     print("\n--- NEXT MISSION (OPTIMIZED ROUTE) ---")
     active_dict_incidents = rank_incidents(incidents)
     if not active_dict_incidents:
-        print("No active incidents to generate missions.")
+        print("No active incidents to plan missions for.")
         return
 
-    # Convert dictionary incidents into Dijkstra Incident dataclass objects
     dijkstra_incidents = []
     for inc in active_dict_incidents:
         score = calculate_priority_score(inc)
@@ -70,17 +76,17 @@ def get_next_mission():
         print(f"Incident Target  : {best_mission.incident.name} (ID: {best_mission.incident.id})")
         print(f"Priority Score   : {best_mission.incident.priority}")
         print(f"Route Distance   : {best_mission.route.distance_km:.1f} km")
-        print(f"Mission Score    : {best_mission.mission_score:.1f}")
+        print(f"Mission Score    : {best_mission.mission_score:.1f} (Priority - Distance)")
         print(f"Optimal Path     : {route_str}")
 
-    except UnknownLocationError as e:
-        print(f"Pathfinding Error: {e}")
+    except (UnknownLocationError, UnreachableLocationError, MissionPlannerError) as e:
+        print(f"\nError planning mission: {e}")
 
 
 def update_incident():
     print("\n--- UPDATE INCIDENT STATUS ---")
     if not incidents:
-        print("No incidents found.")
+        print("No incidents registered.")
         return
 
     inc_id = input("Enter Incident ID to update (e.g., INC-001): ").strip().upper()
@@ -91,7 +97,14 @@ def update_incident():
         return
 
     print(f"Current Status of {target['id']}: {target['status']}")
-    print("1. Set IN_PROGRESS\n2. Set RESOLVED\n3. Cancel")
+    if target["status"] == "RESOLVED":
+        print("Resolved incidents cannot be updated.")
+        return
+
+    print("Select new status:")
+    print("1. Set IN_PROGRESS")
+    print("2. Set RESOLVED")
+    print("3. Cancel")
     choice = input("Choice: ").strip()
 
     if choice == "1":
@@ -100,6 +113,21 @@ def update_incident():
     elif choice == "2":
         target["status"] = "RESOLVED"
         print("Status updated to RESOLVED.")
+    else:
+        print("Update cancelled.")
+
+
+def view_dashboard():
+    print("\n--- DASHBOARD ---")
+    active = sum(1 for i in incidents if i["status"] != "RESOLVED")
+    critical = sum(1 for i in incidents if i["severity"] == "CRITICAL" and i["status"] != "RESOLVED")
+    in_progress = sum(1 for i in incidents if i["status"] == "IN_PROGRESS")
+    resolved = sum(1 for i in incidents if i["status"] == "RESOLVED")
+
+    print(f"Active Incidents   : {active}")
+    print(f"Critical Incidents : {critical}")
+    print(f"In Progress        : {in_progress}")
+    print(f"Resolved           : {resolved}")
 
 
 def show_menu():
@@ -111,7 +139,8 @@ def show_menu():
     print("3. View Response Priority")
     print("4. Get Next Mission (Dijkstra Pathfinding)")
     print("5. Update Incident Status")
-    print("6. Exit")
+    print("6. View Dashboard")
+    print("7. Exit")
     print("=" * 40)
 
 
@@ -131,10 +160,12 @@ def main():
         elif choice == "5":
             update_incident()
         elif choice == "6":
+            view_dashboard()
+        elif choice == "7":
             print("\nExiting Command Centre. Stay safe, Spider-Man!")
             break
         else:
-            print("Invalid selection. Try again.")
+            print("Invalid selection. Please choose 1-7.")
 
 
 if __name__ == "__main__":
